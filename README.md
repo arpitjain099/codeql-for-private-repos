@@ -29,6 +29,8 @@ This project provides GitHub Actions workflows that let you scan private reposit
 - Python – [`python-codeql-action.yml`](.github/workflows/python-codeql-action.yml)
 - JavaScript – [`javascript-codeql-action.yml`](.github/workflows/javascript-codeql-action.yml)
 - Go – [`go-codeql-action.yml`](.github/workflows/go-codeql-action.yml)
+- Typescript – [`typescript-codeql-action.yml`](.github/workflows/typescript-codeql-action.yml)
+- Ruby – [`ruby-codeql-action.yml`](.github/workflows/ruby-codeql-action.yml)
 
 Each workflow is fully standalone and customizable.
 
@@ -59,6 +61,8 @@ Copy one of the following workflow files into your repository:
 - `.github/workflows/python-codeql-action.yml`
 - `.github/workflows/javascript-codeql-action.yml`
 - `.github/workflows/go-codeql-action.yml`
+- `.github/workflows/typescript-codeql-action.yml`
+- `.github/workflows/ruby-codeql-action.yml`
 
 ### 2. Configure Workflow (Optional)
 

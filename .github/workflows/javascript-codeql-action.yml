@@ -44,8 +44,8 @@ jobs:
 
       - name: Analyze Code with CodeQL
         run: |
-          codeql database analyze codeql-db codeql/javascript-queries \
-            --format=sarif-latest --output=results.sarif --download
+          codeql database analyze codeql-db \
+            --format=sarif-latest --output=results.sarif
 
       - name: Upload SARIF Results
         uses: actions/upload-artifact@v4
