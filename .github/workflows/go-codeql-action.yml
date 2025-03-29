@@ -1,0 +1,134 @@
+name: "Go - CodeQL for local repo"
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to run the scan on"
+        required: false
+        default: "main"
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 8 * * *"
+
+jobs:
+  analyze:
+    name: "Local CodeQL Analysis"
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || 'main' }}
+
+      - name: Download CodeQL Bundle
+        run: |
+          mkdir -p $HOME/codeql-bundle
+          curl -Lo $HOME/codeql-bundle/codeql-bundle.tar.gz https://github.com/github/codeql-action/releases/latest/download/codeql-bundle-linux64.tar.gz
+          tar -xzf $HOME/codeql-bundle/codeql-bundle.tar.gz -C $HOME/codeql-bundle
+          echo "$HOME/codeql-bundle/codeql" >> $GITHUB_PATH
+
+      - name: Verify CodeQL CLI Configuration
+        run: codeql resolve packs
+
+      - name: Create CodeQL Database
+        run: codeql database create codeql-db --language=go --source-root=.
+
+      - name: Analyze Code with CodeQL
+        run: |
+          codeql database analyze codeql-db codeql/go-queries \
+            --format=sarif-latest --output=results.sarif --download
+
+      - name: Upload SARIF Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-results
+          path: results.sarif
+
+      - name: Update CodeQL Scan Results Issue
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const sarifData = JSON.parse(fs.readFileSync('results.sarif', 'utf8'));
+            const results = (sarifData.runs && sarifData.runs[0].results) || [];
+            
+            let summary = "### CodeQL Scan Results Summary\n\n";
+            if(results.length === 0) {
+              summary += "No issues found.";
+            } else {
+              summary += `Found **${results.length}** issue(s):\n\n`;
+              results.forEach((result, index) => {
+                const ruleId = result.ruleId || "unknown";
+                const message = (result.message && result.message.text) || "";
+                let location = "";
+                if(result.locations && result.locations.length > 0) {
+                  const loc = result.locations[0].physicalLocation;
+                  location = `File: ${loc.artifactLocation.uri}, Line: ${loc.region.startLine}, Columns: ${loc.region.startColumn}-${loc.region.endColumn}`;
+                }
+
+                let codeFlowSummary = "";
+                if(result.codeFlows && result.codeFlows.length > 0) {
+                  const firstThreadFlows = result.codeFlows[0].threadFlows;
+                  if (firstThreadFlows && firstThreadFlows.length > 0) {
+                    const firstLocations = firstThreadFlows[0].locations;
+                    if (firstLocations && firstLocations.length > 0) {
+                      const flow = firstLocations[0].location;
+                      const flowMsg = flow.message ? flow.message.text : "";
+                      const flowFile = flow.physicalLocation.artifactLocation.uri;
+                      const flowLine = flow.physicalLocation.region.startLine;
+                      codeFlowSummary = `\n- **Code Flow**: ${flowFile} at line ${flowLine} – ${flowMsg}`;
+                    }
+                  }
+                }
+
+                let relatedSummary = "";
+                if(result.relatedLocations && result.relatedLocations.length > 0) {
+                  relatedSummary = "\n- **Related Locations:**";
+                  result.relatedLocations.forEach((rel) => {
+                    const relFile = rel.physicalLocation.artifactLocation.uri;
+                    const relLine = rel.physicalLocation.region.startLine;
+                    const relMsg = (rel.message && rel.message.text) || "";
+                    relatedSummary += `\n  - ${relFile} at line ${relLine}: ${relMsg}`;
+                  });
+                }
+
+                summary += `**${index + 1}. [${ruleId}]**\n- **Message**: ${message}\n- **Location**: ${location}${codeFlowSummary}${relatedSummary}\n\n`;
+              });
+            }
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: "codeql-scan",
+              state: "open"
+            });
+
+            if (issues.length > 0) {
+              const issueNumber = issues[0].number;
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                title: "CodeQL Scan Results",
+                body: summary
+              });
+              console.log(`Updated issue #${issueNumber} with CodeQL scan results.`);
+            } else {
+              const { data: newIssue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: "CodeQL Scan Results",
+                body: summary,
+                labels: ["codeql-scan"]
+              });
+              console.log(`Created issue #${newIssue.number} with CodeQL scan results.`);
+            }
