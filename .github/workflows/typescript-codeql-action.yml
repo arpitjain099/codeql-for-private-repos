@@ -1,4 +1,4 @@
-name: "Go - CodeQL for local repo"
+name: "Typescript - CodeQL for local repo"
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ on:
 
 jobs:
   analyze:
-    name: "Go - Local CodeQL Analysis"
+    name: "Typescript - Local CodeQL Analysis"
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -40,7 +40,7 @@ jobs:
         run: codeql resolve packs
 
       - name: Create CodeQL Database
-        run: codeql database create codeql-db --language=go --source-root=.
+        run: codeql database create codeql-db --language=typescript --source-root=.
 
       - name: Analyze Code with CodeQL
         run: |
@@ -61,7 +61,7 @@ jobs:
             const sarifData = JSON.parse(fs.readFileSync('results.sarif', 'utf8'));
             const results = (sarifData.runs && sarifData.runs[0].results) || [];
             
-            let summary = "### CodeQL Scan Results Summary for Go\n\n";
+            let summary = "### CodeQL Scan Results Summary for Typescript\n\n";
             if(results.length === 0) {
               summary += "No issues found.";
             } else {
