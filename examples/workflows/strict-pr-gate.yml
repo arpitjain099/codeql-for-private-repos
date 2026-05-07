@@ -1,0 +1,24 @@
+# Fails PRs that introduce CodeQL findings of severity ≥ 7.0,
+# but only for findings on lines the PR actually changes.
+# Existing findings in the codebase do not block merging.
+
+name: CodeQL (PR gate)
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  codeql:
+    uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@main
+    with:
+      languages: 'auto'
+      fail-on: 'severity:7.0'
+      diff-only: true
+      pr-comments: 'true'
+      create-issue: 'false'

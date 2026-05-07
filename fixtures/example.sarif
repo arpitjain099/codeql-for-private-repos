@@ -1,0 +1,98 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "CodeQL",
+          "rules": [
+            {
+              "id": "py/sql-injection",
+              "name": "py/sql-injection",
+              "shortDescription": { "text": "SQL query built from user-controlled sources" },
+              "fullDescription": { "text": "Building a SQL query from user-controlled input is vulnerable to insertion of malicious SQL code by the user." },
+              "defaultConfiguration": { "level": "error" },
+              "helpUri": "https://codeql.github.com/codeql-query-help/python/py-sql-injection/",
+              "properties": {
+                "tags": ["security", "external/cwe/cwe-089"],
+                "security-severity": "8.8"
+              }
+            },
+            {
+              "id": "py/clear-text-logging-sensitive-data",
+              "name": "py/clear-text-logging-sensitive-data",
+              "shortDescription": { "text": "Clear-text logging of sensitive information" },
+              "defaultConfiguration": { "level": "warning" },
+              "helpUri": "https://codeql.github.com/codeql-query-help/python/py-clear-text-logging-sensitive-data/",
+              "properties": {
+                "tags": ["security"],
+                "security-severity": "5.5"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "py/sql-injection",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": { "text": "This SQL query depends on a user-provided value." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "app/views/users.py" },
+                "region": { "startLine": 42, "endLine": 42, "startColumn": 5, "endColumn": 60 }
+              }
+            }
+          ],
+          "partialFingerprints": { "primaryLocationLineHash": "abcd1234:1" },
+          "codeFlows": [
+            {
+              "threadFlows": [
+                {
+                  "locations": [
+                    {
+                      "location": {
+                        "physicalLocation": {
+                          "artifactLocation": { "uri": "app/views/users.py" },
+                          "region": { "startLine": 12 }
+                        },
+                        "message": { "text": "user-supplied value reaches request.GET[...]" }
+                      }
+                    },
+                    {
+                      "location": {
+                        "physicalLocation": {
+                          "artifactLocation": { "uri": "app/views/users.py" },
+                          "region": { "startLine": 42 }
+                        },
+                        "message": { "text": "value flows into raw SQL query" }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "ruleId": "py/clear-text-logging-sensitive-data",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": { "text": "Sensitive data returned by getPassword is logged here." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "app/auth/login.py" },
+                "region": { "startLine": 88, "endLine": 88, "startColumn": 9, "endColumn": 35 }
+              }
+            }
+          ],
+          "partialFingerprints": { "primaryLocationLineHash": "deadbeef:1" }
+        }
+      ]
+    }
+  ]
+}

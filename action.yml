@@ -1,0 +1,185 @@
+name: 'CodeQL for Private Repos'
+description: 'Run CodeQL on private repos without GHAS. SARIF stays in your repo. Reports to PR comments, GitHub issues, and Slack.'
+author: 'Arpit Jain'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  language:
+    description: |
+      Language to scan. Aliases accepted: python, javascript, typescript, go,
+      java, kotlin, c, cpp, csharp, ruby, swift, or "auto" to detect.
+    required: true
+  query-suite:
+    description: 'CodeQL query suite or path to a .qls file. Default: security-extended.'
+    required: false
+    default: 'security-extended'
+  build-mode:
+    description: 'CodeQL build mode: autobuild | none | manual.'
+    required: false
+    default: 'autobuild'
+  build-command:
+    description: 'Build command to run when build-mode is "manual" (compiled languages).'
+    required: false
+    default: ''
+  fail-on:
+    description: |
+      Severity threshold above which the job fails.
+      One of: none | note | warning | error | severity:N.N (e.g. severity:7.0).
+    required: false
+    default: 'error'
+  create-issue:
+    description: 'Create/update a tracking issue: true | false | auto (default: only on non-PR events).'
+    required: false
+    default: 'auto'
+  issue-label:
+    description: 'Label applied to the tracking issue.'
+    required: false
+    default: 'codeql-scan'
+  issue-title:
+    description: 'Title of the tracking issue.'
+    required: false
+    default: 'CodeQL Scan Results'
+  pr-comments:
+    description: 'Post PR review comments on changed lines: true | false | auto (default: only on PR events).'
+    required: false
+    default: 'auto'
+  step-summary:
+    description: 'Write findings table to the GitHub Actions run summary.'
+    required: false
+    default: 'true'
+  annotations:
+    description: 'Emit GitHub Actions annotations for each finding.'
+    required: false
+    default: 'true'
+  diff-only:
+    description: 'On PRs, only report findings touching changed lines.'
+    required: false
+    default: 'false'
+  baseline-path:
+    description: 'Path to a baseline JSON file of pre-existing findings to ignore.'
+    required: false
+    default: ''
+  upload-artifact:
+    description: 'Upload the raw SARIF as a workflow artifact.'
+    required: false
+    default: 'true'
+  artifact-name:
+    description: 'Name of the SARIF artifact.'
+    required: false
+    default: ''
+  slack-webhook-url:
+    description: 'Slack incoming webhook URL. Pass via secret. Empty to disable.'
+    required: false
+    default: ''
+  slack-min-severity:
+    description: 'Minimum severity for Slack notifications: none|note|warning|error|severity:N.N.'
+    required: false
+    default: 'error'
+  slack-on-clean:
+    description: 'Send a Slack message even when no findings.'
+    required: false
+    default: 'false'
+  github-token:
+    description: 'GitHub token. Defaults to github.token.'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  sarif-path:
+    description: 'Path to the SARIF file produced by this scan.'
+    value: ${{ steps.locate.outputs.sarif }}
+  findings-count:
+    description: 'Number of findings (after filters).'
+    value: ${{ steps.report.outputs.findings-count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Resolve language
+      id: lang
+      shell: bash
+      env:
+        RAW: ${{ inputs.language }}
+      run: |
+        set -e
+        if [ "$RAW" = "auto" ]; then
+          node "${{ github.action_path }}/scripts/detect-language.mjs"
+          # detect-language writes language= to $GITHUB_OUTPUT itself
+        else
+          # Map aliases to codeql-action v3 language IDs
+          case "$RAW" in
+            javascript|typescript|js|ts) MAPPED=javascript-typescript ;;
+            java|kotlin)                 MAPPED=java-kotlin ;;
+            c|cpp|c++|cxx)               MAPPED=c-cpp ;;
+            "c#"|cs)                     MAPPED=csharp ;;
+            *)                           MAPPED="$RAW" ;;
+          esac
+          echo "language=$MAPPED" >> "$GITHUB_OUTPUT"
+          echo "Resolved language: $MAPPED"
+        fi
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ steps.lang.outputs.language }}
+        queries: ${{ inputs.query-suite }}
+        build-mode: ${{ inputs.build-mode }}
+
+    - name: Run build command
+      if: inputs.build-mode == 'manual' && inputs.build-command != ''
+      shell: bash
+      run: ${{ inputs.build-command }}
+
+    - name: Analyze with CodeQL
+      id: analyze
+      uses: github/codeql-action/analyze@v3
+      with:
+        upload: never
+        output: ${{ runner.temp }}/codeql-sarif
+
+    - name: Locate SARIF
+      id: locate
+      shell: bash
+      run: |
+        set -e
+        DIR="${{ runner.temp }}/codeql-sarif"
+        # codeql-action writes one .sarif per language; we ran one language.
+        SARIF=$(ls "$DIR"/*.sarif 2>/dev/null | head -n1 || true)
+        if [ -z "$SARIF" ]; then
+          echo "::error::No SARIF file produced in $DIR"
+          ls -la "$DIR" || true
+          exit 1
+        fi
+        echo "sarif=$SARIF" >> "$GITHUB_OUTPUT"
+        echo "Located SARIF: $SARIF"
+
+    - name: Upload SARIF artifact
+      if: inputs.upload-artifact == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name != '' && inputs.artifact-name || format('codeql-sarif-{0}', steps.lang.outputs.language) }}
+        path: ${{ steps.locate.outputs.sarif }}
+        if-no-files-found: error
+
+    - name: Report findings
+      id: report
+      shell: bash
+      env:
+        INPUT_SARIF_FILE:        ${{ steps.locate.outputs.sarif }}
+        INPUT_LANGUAGE:          ${{ steps.lang.outputs.language }}
+        INPUT_FAIL_ON:           ${{ inputs.fail-on }}
+        INPUT_CREATE_ISSUE:      ${{ inputs.create-issue }}
+        INPUT_ISSUE_LABEL:       ${{ inputs.issue-label }}
+        INPUT_ISSUE_TITLE:       ${{ inputs.issue-title }}
+        INPUT_PR_COMMENTS:       ${{ inputs.pr-comments }}
+        INPUT_STEP_SUMMARY:      ${{ inputs.step-summary }}
+        INPUT_ANNOTATIONS:       ${{ inputs.annotations }}
+        INPUT_DIFF_ONLY:         ${{ inputs.diff-only }}
+        INPUT_BASELINE_PATH:     ${{ inputs.baseline-path }}
+        INPUT_SLACK_WEBHOOK_URL: ${{ inputs.slack-webhook-url }}
+        INPUT_SLACK_MIN_SEVERITY: ${{ inputs.slack-min-severity }}
+        INPUT_SLACK_ON_CLEAN:    ${{ inputs.slack-on-clean }}
+        GITHUB_TOKEN:            ${{ inputs.github-token }}
+      run: node "${{ github.action_path }}/scripts/report.mjs"

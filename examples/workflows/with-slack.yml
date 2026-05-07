@@ -1,0 +1,33 @@
+# Notifies a Slack channel via incoming webhook on every scan.
+#
+# Setup:
+#   1. Create a Slack incoming webhook: https://api.slack.com/messaging/webhooks
+#   2. Add it as repo secret SLACK_WEBHOOK_URL
+#   3. Copy this file to .github/workflows/codeql.yml
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 8 * * *'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  codeql:
+    uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@main
+    with:
+      languages: 'auto'
+      fail-on: 'error'
+      slack-min-severity: 'error'   # 'severity:7.0' for CVSS-style threshold
+      slack-on-clean: false         # true to also notify on clean runs
+    secrets:
+      slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

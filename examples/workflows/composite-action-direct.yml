@@ -1,0 +1,34 @@
+# For users who want to control their own job structure.
+# Calls the composite action directly instead of the reusable workflow.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+
+      # ... your own setup steps here (install secrets, decrypt files, etc.)
+
+      - uses: arpitjain099/codeql-for-private-repos@main
+        with:
+          language: ${{ matrix.language }}
+          fail-on: 'error'
+          # any of the action's inputs are accepted here

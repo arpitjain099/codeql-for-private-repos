@@ -1,0 +1,27 @@
+# Pin the languages explicitly instead of auto-detecting. Useful when:
+#   • Your repo has multiple languages and you only want to scan some
+#   • You want stable, predictable matrix runs in CI
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  codeql:
+    uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@main
+    with:
+      # Comma-separated. Aliases accepted: javascript, typescript, java,
+      # kotlin, c, cpp, c#. Canonical names are also fine.
+      languages: 'python, javascript-typescript, go'
+      query-suite: 'security-extended'
+      fail-on: 'error'

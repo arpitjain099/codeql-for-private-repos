@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-reporter:
+    name: Reporter smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check scripts
+        run: |
+          node --check scripts/report.mjs
+          node --check scripts/detect-language.mjs
+
+      - name: Run reporter against fixture (no-fail mode)
+        env:
+          INPUT_SARIF_FILE: fixtures/example.sarif
+          INPUT_LANGUAGE: python
+          INPUT_FAIL_ON: 'none'
+          INPUT_CREATE_ISSUE: 'false'
+          INPUT_PR_COMMENTS: 'false'
+          INPUT_ANNOTATIONS: 'true'
+          INPUT_STEP_SUMMARY: 'true'
+        run: node scripts/report.mjs
+
+      - name: Run reporter at error threshold (expect failure)
+        env:
+          INPUT_SARIF_FILE: fixtures/example.sarif
+          INPUT_LANGUAGE: python
+          INPUT_FAIL_ON: 'error'
+          INPUT_CREATE_ISSUE: 'false'
+          INPUT_PR_COMMENTS: 'false'
+          INPUT_ANNOTATIONS: 'false'
+          INPUT_STEP_SUMMARY: 'false'
+        run: |
+          if node scripts/report.mjs; then
+            echo "Expected reporter to exit non-zero but it succeeded."
+            exit 1
+          fi
+
+      - name: Test severity:9.0 threshold (expect pass)
+        env:
+          INPUT_SARIF_FILE: fixtures/example.sarif
+          INPUT_LANGUAGE: python
+          INPUT_FAIL_ON: 'severity:9.0'
+          INPUT_CREATE_ISSUE: 'false'
+          INPUT_PR_COMMENTS: 'false'
+          INPUT_ANNOTATIONS: 'false'
+          INPUT_STEP_SUMMARY: 'false'
+        run: node scripts/report.mjs
+
+  lint-workflows:
+    name: Lint workflows (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actionlint
+        id: get_actionlint
+        run: bash <(curl -sSf https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        shell: bash
+      - name: Run actionlint
+        run: ${{ steps.get_actionlint.outputs.executable }} -color
+        shell: bash

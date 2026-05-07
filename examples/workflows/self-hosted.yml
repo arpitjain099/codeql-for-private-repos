@@ -1,0 +1,25 @@
+# Run CodeQL on a self-hosted runner. Source code never leaves your infra,
+# and SARIF results are uploaded only as a workflow artifact (no GitHub
+# code-scanning API call). Replace `self-hosted` with your runner's labels.
+
+name: CodeQL (self-hosted)
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 8 * * *'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  codeql:
+    uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@main
+    with:
+      languages: 'auto'
+      fail-on: 'error'
+      runner: 'self-hosted'   # use 'self-hosted,linux,x64' to be more specific

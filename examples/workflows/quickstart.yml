@@ -1,0 +1,35 @@
+# The fastest way to add CodeQL scanning to a private repo.
+# Copy this file to .github/workflows/codeql.yml in your repo.
+#
+# What you get:
+#   • Languages auto-detected from your source tree
+#   • PR comments on changed lines
+#   • A summary table in every run's "Actions" tab
+#   • A persistent tracking issue updated on each push to main
+#   • Daily scheduled scans
+#   • SARIF artifact for download
+# Cost: $0 — no GitHub Advanced Security required.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 8 * * *'   # daily at 08:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  codeql:
+    uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@main
+    with:
+      languages: 'auto'
+      fail-on: 'error'

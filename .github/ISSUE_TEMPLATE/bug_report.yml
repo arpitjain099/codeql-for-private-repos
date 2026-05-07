@@ -1,0 +1,43 @@
+name: Bug report
+description: Something doesn't work the way the README says it should.
+labels: ['bug']
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What's broken?
+      description: A clear description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow snippet
+      description: The relevant part of your workflow YAML. Redact anything sensitive.
+      render: yaml
+    validations:
+      required: true
+  - type: input
+    id: run-url
+    attributes:
+      label: Link to the failing run
+      description: Public link to the Actions run, if shareable.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Paste the failing step's output (or attach a file).
+      render: shell
+  - type: input
+    id: language
+    attributes:
+      label: Language(s) you scanned
+      placeholder: 'python, javascript-typescript'
+  - type: dropdown
+    id: runner
+    attributes:
+      label: Runner
+      options:
+        - ubuntu-latest
+        - self-hosted
+        - other (mention in description)

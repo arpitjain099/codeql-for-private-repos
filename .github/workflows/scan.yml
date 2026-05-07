@@ -1,0 +1,235 @@
+name: CodeQL Scan (reusable)
+
+# Reusable workflow. Call it from your repo:
+#
+#   jobs:
+#     codeql:
+#       uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@main
+#       with:
+#         languages: 'auto'
+#         fail-on: 'error'
+#       secrets:
+#         slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+#
+# See examples/workflows/* for ready-to-copy snippets.
+
+on:
+  workflow_call:
+    inputs:
+      languages:
+        description: 'Comma-separated languages, or "auto" to detect.'
+        required: false
+        type: string
+        default: 'auto'
+      query-suite:
+        description: 'CodeQL query suite or path to .qls file.'
+        required: false
+        type: string
+        default: 'security-extended'
+      build-mode:
+        description: 'autobuild | none | manual.'
+        required: false
+        type: string
+        default: 'autobuild'
+      build-command:
+        description: 'Build command when build-mode is "manual".'
+        required: false
+        type: string
+        default: ''
+      fail-on:
+        description: 'Severity threshold: none | note | warning | error | severity:N.N.'
+        required: false
+        type: string
+        default: 'error'
+      create-issue:
+        description: 'true | false | auto.'
+        required: false
+        type: string
+        default: 'auto'
+      issue-label:
+        description: 'Label for the tracking issue.'
+        required: false
+        type: string
+        default: 'codeql-scan'
+      pr-comments:
+        description: 'true | false | auto.'
+        required: false
+        type: string
+        default: 'auto'
+      step-summary:
+        description: 'Write summary table to GITHUB_STEP_SUMMARY.'
+        required: false
+        type: boolean
+        default: true
+      annotations:
+        description: 'Emit GitHub Actions annotations for findings.'
+        required: false
+        type: boolean
+        default: true
+      diff-only:
+        description: 'On PRs, only report findings on changed lines.'
+        required: false
+        type: boolean
+        default: false
+      baseline-path:
+        description: 'Path to baseline JSON file.'
+        required: false
+        type: string
+        default: ''
+      slack-min-severity:
+        description: 'Minimum severity to notify Slack.'
+        required: false
+        type: string
+        default: 'error'
+      slack-on-clean:
+        description: 'Send Slack message even when clean.'
+        required: false
+        type: boolean
+        default: false
+      action-ref:
+        description: 'Ref of arpitjain099/codeql-for-private-repos to use for the action. Match the ref you called this workflow with.'
+        required: false
+        type: string
+        default: 'main'
+      runner:
+        description: 'Runner label (use a self-hosted label to keep code on your infra).'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+      ref:
+        description: 'Git ref to scan. Defaults to the event ref.'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      slack-webhook-url:
+        description: 'Slack incoming webhook (optional).'
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  detect:
+    name: Detect languages
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      languages: ${{ steps.matrix.outputs.languages }}
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Resolve language matrix
+        id: matrix
+        shell: bash
+        env:
+          RAW: ${{ inputs.languages }}
+        run: |
+          set -e
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const ALIAS = {
+              javascript:"javascript-typescript", typescript:"javascript-typescript",
+              js:"javascript-typescript", ts:"javascript-typescript",
+              java:"java-kotlin", kotlin:"java-kotlin",
+              c:"c-cpp", cpp:"c-cpp", "c++":"c-cpp", cxx:"c-cpp",
+              "c#":"csharp", cs:"csharp"
+            };
+            const EXT = {
+              ".py":"python",".js":"javascript-typescript",".jsx":"javascript-typescript",
+              ".mjs":"javascript-typescript",".cjs":"javascript-typescript",
+              ".ts":"javascript-typescript",".tsx":"javascript-typescript",
+              ".go":"go",".java":"java-kotlin",".kt":"java-kotlin",".kts":"java-kotlin",
+              ".c":"c-cpp",".cc":"c-cpp",".cpp":"c-cpp",".cxx":"c-cpp",
+              ".h":"c-cpp",".hh":"c-cpp",".hpp":"c-cpp",
+              ".cs":"csharp",".rb":"ruby",".swift":"swift"
+            };
+            const SKIP = new Set([".git","node_modules","vendor","dist","build","out",
+              "target","bin","obj",".venv","venv","__pycache__",".gradle",".idea",
+              ".vscode",".next",".nuxt",".cache","coverage",".tox"]);
+
+            const raw = (process.env.RAW || "auto").trim();
+            let langs;
+            if (raw === "" || raw === "auto") {
+              const counts = {};
+              (function walk(d, dep) {
+                if (dep > 12) return;
+                let entries; try { entries = fs.readdirSync(d, {withFileTypes:true}); } catch { return; }
+                for (const e of entries) {
+                  if (e.isDirectory()) {
+                    if (SKIP.has(e.name) || e.name.startsWith(".")) continue;
+                    walk(path.join(d, e.name), dep+1);
+                  } else if (e.isFile()) {
+                    const lang = EXT[path.extname(e.name).toLowerCase()];
+                    if (lang) counts[lang] = (counts[lang]||0)+1;
+                  }
+                }
+              })(process.env.GITHUB_WORKSPACE || ".", 0);
+              langs = Object.entries(counts).filter(([,n])=>n>=5)
+                .sort((a,b)=>b[1]-a[1]).map(([l])=>l);
+              if (langs.length === 0) {
+                console.error("No supported languages detected. Counts:", counts);
+                process.exit(1);
+              }
+            } else {
+              langs = [...new Set(
+                raw.split(",").map(s=>s.trim().toLowerCase()).filter(Boolean)
+                   .map(l => ALIAS[l] || l)
+              )];
+            }
+            console.log("Languages:", langs.join(", "));
+            fs.appendFileSync(process.env.GITHUB_OUTPUT,
+              "languages=" + JSON.stringify(langs) + "\n");
+          '
+
+  analyze:
+    name: 'CodeQL: ${{ matrix.language }}'
+    needs: detect
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJson(needs.detect.outputs.languages) }}
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: ${{ inputs.diff-only && 0 || 1 }}
+
+      - name: Checkout codeql-for-private-repos action
+        uses: actions/checkout@v4
+        with:
+          repository: arpitjain099/codeql-for-private-repos
+          ref: ${{ inputs.action-ref }}
+          path: .codeql-for-private-repos
+
+      - name: Run CodeQL scan + report
+        uses: ./.codeql-for-private-repos
+        with:
+          language: ${{ matrix.language }}
+          query-suite: ${{ inputs.query-suite }}
+          build-mode: ${{ inputs.build-mode }}
+          build-command: ${{ inputs.build-command }}
+          fail-on: ${{ inputs.fail-on }}
+          create-issue: ${{ inputs.create-issue }}
+          issue-label: ${{ inputs.issue-label }}
+          pr-comments: ${{ inputs.pr-comments }}
+          step-summary: ${{ inputs.step-summary }}
+          annotations: ${{ inputs.annotations }}
+          diff-only: ${{ inputs.diff-only }}
+          baseline-path: ${{ inputs.baseline-path }}
+          slack-webhook-url: ${{ secrets.slack-webhook-url }}
+          slack-min-severity: ${{ inputs.slack-min-severity }}
+          slack-on-clean: ${{ inputs.slack-on-clean }}

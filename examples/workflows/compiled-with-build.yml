@@ -1,0 +1,26 @@
+# For compiled languages (C/C++, C#, Java, etc.) where autobuild
+# can't figure out your build. Provide a manual build command.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  codeql:
+    uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@main
+    with:
+      languages: 'java-kotlin'
+      build-mode: 'manual'
+      build-command: |
+        ./gradlew assemble --no-daemon
+      fail-on: 'error'
