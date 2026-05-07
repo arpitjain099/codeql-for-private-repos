@@ -27,10 +27,10 @@ on:
         type: string
         default: 'security-extended'
       build-mode:
-        description: 'autobuild | none | manual.'
+        description: 'auto | autobuild | none | manual. "auto" picks per language.'
         required: false
         type: string
-        default: 'autobuild'
+        default: 'auto'
       build-command:
         description: 'Build command when build-mode is "manual".'
         required: false

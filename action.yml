@@ -16,9 +16,13 @@ inputs:
     required: false
     default: 'security-extended'
   build-mode:
-    description: 'CodeQL build mode: autobuild | none | manual.'
+    description: |
+      CodeQL build mode. One of: auto | autobuild | none | manual.
+      The default "auto" resolves per-language: `none` for interpreted
+      languages (python, ruby, javascript-typescript, actions) and
+      `autobuild` for compiled (go, java-kotlin, c-cpp, csharp, swift).
     required: false
-    default: 'autobuild'
+    default: 'auto'
   build-command:
     description: 'Build command to run when build-mode is "manual" (compiled languages).'
     required: false
@@ -120,15 +124,35 @@ runs:
           echo "Resolved language: $MAPPED"
         fi
 
+    - name: Resolve build mode
+      id: build
+      shell: bash
+      env:
+        REQUESTED: ${{ inputs.build-mode }}
+        LANG: ${{ steps.lang.outputs.language }}
+      run: |
+        set -e
+        if [ "$REQUESTED" = "auto" ] || [ -z "$REQUESTED" ]; then
+          case "$LANG" in
+            python|ruby|javascript-typescript|actions) MODE=none ;;
+            go|java-kotlin|c-cpp|csharp|swift)         MODE=autobuild ;;
+            *)                                          MODE=autobuild ;;
+          esac
+        else
+          MODE="$REQUESTED"
+        fi
+        echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+        echo "Resolved build-mode for $LANG: $MODE"
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ steps.lang.outputs.language }}
         queries: ${{ inputs.query-suite }}
-        build-mode: ${{ inputs.build-mode }}
+        build-mode: ${{ steps.build.outputs.mode }}
 
     - name: Run build command
-      if: inputs.build-mode == 'manual' && inputs.build-command != ''
+      if: steps.build.outputs.mode == 'manual' && inputs.build-command != ''
       shell: bash
       run: ${{ inputs.build-command }}
 

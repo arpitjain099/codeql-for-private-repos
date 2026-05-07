@@ -84,7 +84,7 @@ Every input is optional except `languages`. Defaults are sensible.
 |---|---|---|
 | `languages` | `auto` | Comma-separated list, or `auto` to detect from source tree. Aliases like `javascript`/`typescript` map to the canonical CodeQL language IDs. |
 | `query-suite` | `security-extended` | Query pack (`security-extended`, `security-and-quality`, `code-scanning`) or path to a `.qls` file. |
-| `build-mode` | `autobuild` | `autobuild`, `none`, or `manual`. Use `manual` with `build-command` for compiled languages with custom builds. |
+| `build-mode` | `auto` | `auto` (picks per language: `none` for interpreted, `autobuild` for compiled), `autobuild`, `none`, or `manual`. Use `manual` with `build-command` for compiled languages with custom builds. |
 | `build-command` | (empty) | Shell command to run between init and analyze when `build-mode: manual`. |
 | `fail-on` | `error` | Severity threshold to fail the job: `none`, `note`, `warning`, `error`, or `severity:N.N` (e.g. `severity:7.0`). |
 | `create-issue` | `auto` | `auto` (only on non-PR events), `true` (always), `false` (never). |
