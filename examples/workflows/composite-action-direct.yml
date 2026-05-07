@@ -27,7 +27,7 @@ jobs:
 
       # ... your own setup steps here (install secrets, decrypt files, etc.)
 
-      - uses: arpitjain099/codeql-for-private-repos@main
+      - uses: arpitjain099/codeql-for-private-repos@v1
         with:
           language: ${{ matrix.language }}
           fail-on: 'error'

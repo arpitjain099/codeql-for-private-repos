@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   codeql:
-    uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@main
+    uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@v1
     with:
       # Comma-separated. Aliases accepted: javascript, typescript, java,
       # kotlin, c, cpp, c#. Canonical names are also fine.

@@ -7,7 +7,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/arpitjain099/codeql-for-private-repos/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/arpitjain099/codeql-for-private-repos/scan.yml?label=ci"></a>
+  <a href="https://github.com/arpitjain099/codeql-for-private-repos/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/arpitjain099/codeql-for-private-repos?label=release&color=blue"></a>
+  <a href="https://github.com/arpitjain099/codeql-for-private-repos/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/arpitjain099/codeql-for-private-repos/ci.yml?label=ci"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
   <a href="https://github.com/arpitjain099/codeql-for-private-repos/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/arpitjain099/codeql-for-private-repos?style=social"></a>
 </p>
@@ -38,7 +39,7 @@ permissions:
 
 jobs:
   codeql:
-    uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@main
+    uses: arpitjain099/codeql-for-private-repos/.github/workflows/scan.yml@v1
     with:
       languages: 'auto'
       fail-on: 'error'
@@ -48,17 +49,102 @@ That's it. Languages get detected from your source tree, scans run on push/PR/da
 
 More patterns — strict PR gating, Slack notifications, self-hosted runners, manual builds — live in [`examples/workflows/`](examples/workflows/).
 
-## What it does
+## What you'll see
 
-| Output | When | What you see |
-|---|---|---|
-| **PR review comments** | On `pull_request` events | Inline comments on changed lines with severity, rule, message, and link to the rule's docs. |
-| **Annotations** | Every run | Findings appear as red/yellow markers in the PR "Files changed" view. |
-| **Run summary** | Every run | A markdown table of findings on the Actions run page (no clicking into logs). |
-| **Tracking issue** | On non-PR events | A single issue labeled `codeql-scan` is created or updated with the latest findings. |
-| **Slack** | Configurable | Threshold-gated notifications via incoming webhook. |
-| **SARIF artifact** | Every run | Raw SARIF available for download or upload to other tools. |
-| **Job exit code** | Every run | The job fails when findings exceed your `fail-on` threshold — wire it into branch protection. |
+Once the workflow is wired up, every push, PR, and scheduled run produces output across these channels. The examples below are synthetic but representative.
+
+### Inline PR review comments
+
+On `pull_request` events, findings on changed lines show up as a single CodeQL review with one comment per finding:
+
+> **🟠 High** · `py/sql-injection`
+>
+> This SQL query depends on a user-provided value.
+>
+> [Learn more](https://codeql.github.com/codeql-query-help/python/py-sql-injection/)
+
+The review header summarises totals and links back to the run for findings outside the diff:
+
+> **CodeQL** flagged 2 issue(s) on changed lines. (3 additional finding(s) outside the diff — see the [run summary](https://github.com/...).)
+
+### File annotations in the diff
+
+The same findings show up as squiggles in the PR's "Files changed" view (CodeQL writes them via GitHub Actions annotations) — no extra setup, this is just how Actions surfaces `::error` / `::warning` commands.
+
+### Actions run summary
+
+Every run writes a markdown table to the run's summary page — visible right at the top of the Actions tab without clicking into logs:
+
+> ## CodeQL Scan — python
+>
+> **3 finding(s):** 1 high · 2 medium
+>
+> | Severity | Rule | Location | Message |
+> |---|---|---|---|
+> | 🟠 High | `py/sql-injection` | `app/views/users.py:42` | This SQL query depends on a user-provided value. |
+> | 🟡 Medium | `py/clear-text-logging-sensitive-data` | `app/auth/login.py:88` | Sensitive data returned by getPassword is logged here. |
+> | 🟡 Medium | `py/insecure-tempfile` | `app/core/temp.py:15` | Insecure use of tempfile module. |
+
+### Tracking issue
+
+For pushes to the default branch and scheduled runs, a single issue labeled `codeql-scan` is created or updated in place — so you always have one canonical "current state" view, never a long history of stale issues:
+
+> **Title:** CodeQL Scan Results
+> **Labels:** `codeql-scan`
+>
+> _Updated by [run #42](https://github.com/...) on `main` at [`a7f3c2b`](https://github.com/...)._
+>
+> ## 3 finding(s)
+>
+> - 🟠 High **1**
+> - 🟡 Medium **2**
+>
+> <details>
+> <summary>🟠 High <code>py/sql-injection</code> — SQL query built from user-controlled sources</summary>
+>
+> **Location:** [`app/views/users.py:42`](https://github.com/...)
+>
+> **Message:** This SQL query depends on a user-provided value.
+>
+> **Reference:** https://codeql.github.com/codeql-query-help/python/py-sql-injection/
+>
+> **Flow**
+> - `app/views/users.py:12` — user-supplied value reaches `request.GET[...]`
+> - `app/views/users.py:42` — value flows into raw SQL query
+> </details>
+
+### Slack notifications
+
+If you set `SLACK_WEBHOOK_URL`, every run that crosses your `slack-min-severity` threshold posts a Block Kit message:
+
+```
+🚨 CodeQL: 3 finding(s) in your-org/your-repo
+   Run #42 · main · a7f3c2b · python
+
+   1 high · 2 medium
+
+   • py/sql-injection — app/views/users.py:42
+   • py/clear-text-logging-sensitive-data — app/auth/login.py:88
+   • py/insecure-tempfile — app/core/temp.py:15
+```
+
+Set `slack-min-severity: 'severity:7.0'` to only get pinged on serious stuff. `slack-on-clean: true` if you also want a green check-in when the scan is clean.
+
+### SARIF artifact
+
+The raw SARIF file is uploaded as a workflow artifact named `codeql-sarif-<language>` so you can download it, diff it across runs, or feed it into other tooling. Available on every run.
+
+### Branch protection (failing the job)
+
+`fail-on` controls the exit code. Wire the workflow into your required-checks list and any PR that introduces a finding above your threshold cannot merge:
+
+```yaml
+with:
+  fail-on: 'severity:7.0'   # CVSS-style numeric, or: error | warning | note | none
+  diff-only: true           # only count findings on lines this PR changes
+```
+
+---
 
 ## Why this exists
 
@@ -78,7 +164,10 @@ This is not a replacement for GHAS — if you have it, use it. It's for the **va
 
 ## Configuration
 
-Every input is optional except `languages`. Defaults are sensible.
+Every input is optional except `languages`. Defaults are sensible — most users only set `languages` and `fail-on`.
+
+<details>
+<summary><b>All inputs</b> (click to expand)</summary>
 
 | Input | Default | Description |
 |---|---|---|
@@ -99,11 +188,13 @@ Every input is optional except `languages`. Defaults are sensible.
 | `runner` | `ubuntu-latest` | Runner label. Use a self-hosted label to keep code on your infra. |
 | `ref` | (event ref) | Git ref to scan. |
 
-Secrets:
+**Secrets**
 
 | Secret | Purpose |
 |---|---|
 | `slack-webhook-url` | Slack incoming webhook URL. Optional. |
+
+</details>
 
 ## Supported languages
 
