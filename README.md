@@ -148,19 +148,36 @@ with:
 
 ## Why this exists
 
-|                                          | GitHub Advanced Security      | This project                                       |
-|------------------------------------------|-------------------------------|----------------------------------------------------|
-| Works on private repos                   | ✅                            | ✅                                                 |
-| Cost                                     | Per-committer Enterprise SKU  | Free — pays only for Actions minutes               |
-| CodeQL engine                            | Official                      | Official (`github/codeql-action/init` & `analyze`) |
-| Inline PR comments                       | ✅                            | ✅                                                 |
-| Code-scanning UI tab                     | ✅                            | ❌ (results live in issues + run summary)          |
-| Slack / webhook integration              | Manual                        | ✅ Built in                                        |
-| Self-hosted runner support               | ✅                            | ✅                                                 |
-| Data leaves your tenancy                 | Stays in GitHub               | Stays in your repo / runner                        |
-| Setup time                               | Enterprise procurement        | Copy-paste a workflow                              |
+CodeQL is **free for public repos**. For private repos, GitHub paywalls the same engine behind [GitHub Advanced Security](https://docs.github.com/en/get-started/learning-about-github/about-github-advanced-security) (now sold as **GitHub Code Security**) — currently **[$30 per active committer per month](https://github.com/pricing)**.
 
-This is not a replacement for GHAS — if you have it, use it. It's for the **vast majority of teams who don't**: solo devs, startups, internal tools, indie projects, anything where "buy Enterprise" isn't on the table.
+That's:
+
+> **A 10-person team:** ~$3,600/year &nbsp;·&nbsp; **A 25-person team:** ~$9,000/year &nbsp;·&nbsp; **A 50-person team:** ~$18,000/year
+
+…just to run CodeQL on a private repo. For solo devs, startups, indie projects, side projects, internal tools, agencies, and bootstrapped companies, that's not on the table.
+
+**This project gives you the same engine, the same query packs, and the same depth of analysis on private repos for free.** It uses the official [`github/codeql-action`](https://github.com/github/codeql-action) under the hood — findings are byte-for-byte identical to what GHAS produces. The only thing it skips is the part of GHAS you actually pay for: the hosted code-scanning UI and the SARIF-upload API.
+
+|                                  | **GitHub Advanced Security**          | **This project**                                       |
+|----------------------------------|---------------------------------------|--------------------------------------------------------|
+| **Private repos**                | 💰 Paid only                          | ✅ **Free**                                            |
+| **Annual cost (10 devs)**        | ~$3,600                               | ✅ **$0** (Actions minutes only)                       |
+| **Setup**                        | Enterprise procurement, contracts     | ✅ Copy-paste a workflow (~30 sec)                     |
+| **CodeQL engine**                | Official `github/codeql-action`       | ✅ Official `github/codeql-action` (identical)         |
+| **Query packs (`security-extended` etc.)** | ✅                          | ✅                                                     |
+| **Inline PR review comments**    | ✅                                    | ✅                                                     |
+| **PR diff annotations**          | ✅                                    | ✅                                                     |
+| **Auto language detection**      | ✅                                    | ✅                                                     |
+| **Slack / webhook out of the box** | ❌ DIY                              | ✅ **Built in**                                        |
+| **Tracking issue per repo**      | ❌                                    | ✅ **Built in**                                        |
+| **Severity-gated CI fail**       | ✅                                    | ✅ (`fail-on: severity:7.0`)                           |
+| **Diff-only mode for PRs**       | Limited                               | ✅                                                     |
+| **Self-hosted runner**           | ✅                                    | ✅                                                     |
+| **Source code stays in your tenancy** | Uploaded to GitHub's API         | ✅ **Never leaves your runner**                        |
+| **Time to first scan**           | Days to weeks (procurement)           | ✅ **Minutes**                                         |
+| **Code-scanning UI tab**         | ✅                                    | ❌ — issue + run summary instead                       |
+
+> **The honest tradeoff:** GHAS gives you a hosted "Security" tab on every repo. This project doesn't — findings live in a tracking issue and the Actions run summary. If a centralized dashboard matters more than the price, GHAS is right for you. For everyone else, the issue-and-summary pattern works just as well — and your code, results, and history stay in your repo.
 
 ## Configuration
 
